@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>高機能 To-Do リスト</title>
+  <style>
+    /* Reset & base */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: "Noto Sans JP", sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+      color: #333;
+    }
+    #app {
+      background: white;
+      width: 100%;
+      max-width: 480px;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 12px 20px rgba(0,0,0,0.1);
+    }
+    h1 {
+      margin-bottom: 24px;
+      font-weight: 700;
+      text-align: center;
+      color: #222;
+    }
+
+    /* 入力フォーム */
+    .input-area {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    input[type="text"] {
+      flex-grow: 1;
+      padding: 12px 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border-color 0.3s ease;
+    }
+    input[type="text"]:focus {
+      border-color: #3f51b5;
+      outline: none;
+    }
+    button.add-btn {
+      background-color: #3f51b5;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0 20px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button.add-btn:hover {
+      background-color: #303f9f;
+    }
+
+    /* タスクリスト */
+    ul.task-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    ul.task-list::-webkit-scrollbar {
+      width: 8px;
+    }
+    ul.task-list::-webkit-scrollbar-thumb {
+      background: #bbb;
+      border-radius: 4px;
+    }
+    li.task-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #eee;
+      transition: background-color 0.2s ease;
+    }
+    li.task-item:hover {
+      background-color: #fafafa;
+    }
+
+    /* タスクテキスト */
+    span.task-text {
+      flex-grow: 1;
+      font-size: 17px;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.3s ease;
+    }
+    li.completed span.task-text {
+      text-decoration: line-through;
+      color: #999;
+    }
+
+    /* 編集用input */
+    input.edit-input {
+      font-size: 17px;
+      padding: 6px 8px;
+      flex-grow: 1;
+      border: 1.5px solid #3f51b5;
+      border-radius: 6px;
+    }
+
+    /* ボタン */
+    button.delete-btn {
+      background: #e53935;
+      border: none;
+      color: white;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      margin-left: 16px;
+    }
+    button.delete-btn:hover {
+      background: #b71c1c;
+    }
+
+    /* スマホ対応 */
+    @media (max-width: 480px) {
+      #app {
+        padding: 20px;
+        margin: 0 12px;
+      }
+      input[type="text"], button.add-btn {
+        font-size: 14px;
+        padding: 10px 14px;
+      }
+      button.delete-btn {
+        padding: 5px 10px;
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      span.task-text, input.edit-input {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>高機能 To-Do リスト</h1>
+    <div class="input-area">
+      <input type="text" id="taskInput" placeholder="新しいタスクを入力してください" />
+      <button class="add-btn" id="addBtn">追加</button>
+    </div>
+    <ul class="task-list" id="taskList"></ul>
+  </div>
+
+  <script>
+    const taskInput = document.getElementById('taskInput');
+    const addBtn = document.getElementById('addBtn');
+    const taskList = document.getElementById('taskList');
+
+    // localStorageのキー
+    const STORAGE_KEY = 'todo-tasks';
+
+    // タスク一覧（オブジェクトの配列で管理）
+    let tasks = [];
+
+    // ページ読み込み時にlocalStorageから読み込む
+    window.onload = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        tasks = JSON.parse(saved);
+        tasks.forEach(task => addTaskToDOM(task));
+      }
+    };
+
+    // localStorageに保存
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    // タスクをDOMに追加
+    function addTaskToDOM(task) {
+      const li = document.createElement('li');
+      li.className = 'task-item';
+      if (task.completed) li.classList.add('completed');
+      li.dataset.id = task.id;
+
+      // タスクテキスト
+      const span = document.createElement('span');
+      span.className = 'task-text';
+      span.textContent = task.text;
+
+      // タスク完了切替（クリックで）
+      span.addEventListener('click', () => {
+        li.classList.toggle('completed');
+        updateTaskStatus(task.id, li.classList.contains('completed'));
+      });
+
+      // ダブルクリックで編集可能に
+      span.addEventListener('dblclick', () => {
+        enableEditing(li, span, task.id);
+      });
+
+      // 削除ボタン
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '削除';
+      deleteBtn.addEventListener('click', () => {
+        removeTask(task.id);
+        taskList.removeChild(li);
+      });
+
+      li.appendChild(span);
+      li.appendChild(deleteBtn);
+      taskList.appendChild(li);
+    }
+
+    // 編集モードにする関数
+    function enableEditing(li, span, id) {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'edit-input';
+      input.value = span.textContent;
+      li.replaceChild(input, span);
+      input.focus();
+
+      // 編集完了の処理（Enter or フォーカスアウト）
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          finishEditing(input, span, li, id);
+        } else if (e.key === 'Escape') {
+          cancelEditing(input, span, li);
+        }
+      });
+      input.addEventListener('blur', () => {
+        finishEditing(input, span, li, id);
+      });
+    }
+
+    // 編集完了して更新
+    function finishEditing(input, span, li, id) {
+      const newValue = input.value.trim();
+      if (!newValue) {
+        alert('タスクは空にできません。');
+        input.focus();
+        return;
+      }
+      span.textContent = newValue;
+      li.replaceChild(span, input);
+      updateTaskText(id, newValue);
+    }
+
+    // 編集キャンセル
+    function cancelEditing(input, span, li) {
+      li.replaceChild(span, input);
+    }
+
+    // タスク追加ボタンの処理
+    addBtn.addEventListener('click', () => {
+      const text = taskInput.value.trim();
+      if (!text) {
+        alert('タスクを入力してください。');
+        return;
+      }
+      const newTask = {
+        id: Date.now().toString(),
+        text,
+        completed: false
+      };
+      tasks.push(newTask);
+      saveTasks();
+      addTaskToDOM(newTask);
+      taskInput.value = '';
+      taskInput.focus();
+    });
+
+    // Enterキーでも追加可能に
+    taskInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter')
