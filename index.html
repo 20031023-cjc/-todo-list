@@ -107,6 +107,12 @@
     const taskList = document.getElementById('taskList');
 
     document.addEventListener('DOMContentLoaded', loadTasks);
+    taskInput.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') {
+    addTask();
+  }
+});
+
 
     function addTask() {
       const taskText = taskInput.value.trim();
